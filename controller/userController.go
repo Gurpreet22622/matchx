@@ -7,6 +7,7 @@ import (
 	"log"
 	"matchx/dbServer"
 	"matchx/models"
+	"matchx/rf"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -140,6 +141,68 @@ func RegisterNP(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, property_id)
 }
 
+func PredictR(ctx *gin.Context) {
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		log.Println("Error while reading Register new property request body", err)
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	var property models.RegisterProperty
+	err = json.Unmarshal(body, &property)
+	if err != nil {
+		log.Println("Error while unmarshaling Register new property request body", err)
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	log.Println(property)
+
+	count, responseErr := countLocality(property.Locality, dbServer.Dbhandler)
+	if responseErr != nil {
+		ctx.AbortWithStatusJSON(responseErr.Status, responseErr)
+		return
+	}
+	rent, responseErr := rf.PredictRent(property.PropertyType, property.FurnishedStatus, property.LeaseType, property.AC, property.Internet, property.RO, property.Kitchen, property.Geezer, count, float32(property.Location.Latitude), float32(property.Location.Longitude), property.PropertyArea)
+	if responseErr != nil {
+		ctx.AbortWithStatusJSON(responseErr.Status, responseErr)
+		return
+	}
+	ctx.JSON(http.StatusOK, rent)
+}
+
+func countLocality(locality string, dbHandler *sql.DB) (float32, *models.ResponseError) {
+	query := `SELECT COUNT(*) AS frequency
+				FROM property
+				WHERE locality = $1;`
+	rows, err := dbHandler.Query(query, locality)
+	if err != nil {
+		return 0, &models.ResponseError{
+			Message: err.Error(),
+			Status:  http.StatusInternalServerError,
+		}
+	}
+	defer rows.Close()
+	var count float32
+	for rows.Next() {
+		err := rows.Scan(&count)
+		if err != nil {
+			return 0, &models.ResponseError{
+				Message: err.Error(),
+				Status:  http.StatusInternalServerError,
+			}
+		}
+	}
+	if rows.Err() != nil {
+		return 0, &models.ResponseError{
+			Message: "Error while reading rows",
+			Status:  http.StatusInternalServerError,
+		}
+	}
+	return count, nil
+}
+
 func Login(ctx *gin.Context) {
 	body, err := io.ReadAll(ctx.Request.Body)
 	if err != nil {
@@ -270,10 +333,10 @@ func createUser(user *models.User, dbHandler *sql.DB) (string, *models.ResponseE
 }
 
 func createProperty(property *models.RegisterProperty, dbHandler *sql.DB) (string, *models.ResponseError) {
-	query := `insert into property(user_id, property_type, longitude, latitude, locality, lease_type, furnished_status, property_area, internet, ac, ro, kitchen, geezer)
-				values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+	query := `insert into property(user_id, property_type, longitude, latitude, locality, lease_type, furnished_status, property_area, internet, ac, ro, kitchen, geezer,rent)
+				values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 				returning id`
-	rows, err := dbHandler.Query(query, property.UserID, property.PropertyType, property.Location.Longitude, property.Location.Latitude, property.Locality, property.LeaseType, property.FurnishedStatus, property.PropertyArea, property.Internet, property.AC, property.RO, property.Kitchen, property.Geezer)
+	rows, err := dbHandler.Query(query, property.UserID, property.PropertyType, property.Location.Longitude, property.Location.Latitude, property.Locality, property.LeaseType, property.FurnishedStatus, property.PropertyArea, property.Internet, property.AC, property.RO, property.Kitchen, property.Geezer, property.Rent)
 	if err != nil {
 		return "", &models.ResponseError{
 			Message: err.Error(),

@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"log"
+
 	"matchx/controller"
 
 	"github.com/gin-contrib/cors"
@@ -16,9 +17,6 @@ type HttpServer struct {
 }
 
 func InitHttpServer(config *viper.Viper, dbHandler *sql.DB) HttpServer {
-	// usersRepository := repositories.NewUsersRepository(dbHandler)
-	// usersService := services.NewUsersService(usersRepository)
-	// usersController := controllers.NewUsersController(usersService)
 
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -27,11 +25,10 @@ func InitHttpServer(config *viper.Viper, dbHandler *sql.DB) HttpServer {
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "Token"},
 	}))
 
-	//router.POST("/login", usersController.Login)
-	//router.POST("/logout", usersController.Logout)
 	router.POST("/login", controller.Login)
 	router.GET("/user", controller.GetUser)
 	router.POST("/registerNP", controller.RegisterNP)
+	router.POST("/predictR", controller.PredictR)
 	router.GET("/nearbyProps", controller.GetNearbyProps)
 
 	hs := HttpServer{
@@ -43,7 +40,7 @@ func InitHttpServer(config *viper.Viper, dbHandler *sql.DB) HttpServer {
 }
 
 func (hs HttpServer) Start() {
-	//err := hs.router.Run(hs.config.GetString("http.server_address"))
+
 	err := hs.router.Run("0.0.0.0:8080")
 	if err != nil {
 		log.Fatalf("Error while starting HTTP server: %v", err)

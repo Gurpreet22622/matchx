@@ -14,4 +14,5 @@ type RegisterProperty struct {
 	RO              bool        `json:"ro"`
 	Kitchen         bool        `json:"kitchen"`
 	Geezer          bool        `json:"geezer"`
+	Rent            float32     `json:"rent"`
 }
